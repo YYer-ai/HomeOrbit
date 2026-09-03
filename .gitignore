@@ -1,0 +1,31 @@
+# Python
+api/.venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+!.env.example
+
+# Node
+web/node_modules/
+web/.next/
+
+# 缓存（依赖下载均保留在项目内，但不入 git）
+.npm-cache/
+.pip-cache/
+.uv-cache/
+.firecrawl/
+.pytest_cache/
+.superpowers/
+tmp/
+
+# 数据与临时文件
+data/raw/
+data/valhalla/
+data/docker-images/
+data/tools/
+findings.md
+progress.md
+task_plan.md
+*.log
+.find-node.ps1

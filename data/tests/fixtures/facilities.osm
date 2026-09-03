@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<osm version="0.6" generator="HomeOrbit tests">
+  <node id="1" lat="37.7700" lon="-122.4200">
+    <tag k="amenity" v="school"/>
+    <tag k="name" v="Bay School"/>
+  </node>
+  <node id="2" lat="37.7710" lon="-122.4210">
+    <tag k="shop" v="supermarket"/>
+    <tag k="name" v="Bay Market"/>
+  </node>
+  <node id="3" lat="37.7720" lon="-122.4220">
+    <tag k="highway" v="bus_stop"/>
+    <tag k="name" v="Main Stop"/>
+  </node>
+  <node id="4" lat="37.7721" lon="-122.4221">
+    <tag k="public_transport" v="platform"/>
+    <tag k="name" v="Main Stop"/>
+  </node>
+  <node id="5" lat="37.7715" lon="-122.4205">
+    <tag k="leisure" v="park"/>
+    <tag k="name" v="Point Park Must Be Excluded"/>
+  </node>
+  <node id="6" lat="37.7717" lon="-122.4207">
+    <tag k="amenity" v="marketplace"/>
+    <tag k="name" v="Farmers Market"/>
+  </node>
+  <node id="10" lat="37.7730" lon="-122.4230"/>
+  <node id="11" lat="37.7730" lon="-122.4225"/>
+  <node id="12" lat="37.7735" lon="-122.4225"/>
+  <node id="13" lat="37.7735" lon="-122.4230"/>
+  <way id="100">
+    <nd ref="10"/><nd ref="11"/><nd ref="12"/><nd ref="13"/><nd ref="10"/>
+    <tag k="amenity" v="hospital"/>
+    <tag k="name" v="Bay Hospital"/>
+    <tag k="area" v="yes"/>
+  </way>
+  <node id="20" lat="37.7740" lon="-122.4240"/>
+  <node id="21" lat="37.7740" lon="-122.4230"/>
+  <node id="22" lat="37.7750" lon="-122.4230"/>
+  <node id="23" lat="37.7750" lon="-122.4240"/>
+  <way id="200">
+    <nd ref="20"/><nd ref="21"/><nd ref="22"/><nd ref="23"/><nd ref="20"/>
+    <tag k="leisure" v="park"/>
+    <tag k="name" v="Bay Park"/>
+    <tag k="area" v="yes"/>
+  </way>
+  <node id="30" lat="37.7760" lon="-122.4240"/>
+  <node id="31" lat="37.7760" lon="-122.4230"/>
+  <node id="32" lat="37.7770" lon="-122.4230"/>
+  <node id="33" lat="37.7770" lon="-122.4240"/>
+  <way id="300">
+    <nd ref="30"/><nd ref="31"/><nd ref="32"/><nd ref="33"/><nd ref="30"/>
+    <tag k="landuse" v="recreation_ground"/>
+    <tag k="name" v="Recreation Ground"/>
+    <tag k="area" v="yes"/>
+  </way>
+</osm>

@@ -1,0 +1,47 @@
+services:
+  postgis:
+    image: postgis/postgis:17-3.5
+    container_name: homeorbit-postgis
+    environment:
+      POSTGRES_DB: homeorbit
+      POSTGRES_USER: homeorbit
+      POSTGRES_PASSWORD: homeorbit_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgis_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homeorbit -d homeorbit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  valhalla-build:
+    image: ghcr.io/valhalla/valhalla:latest
+    profiles: ["build"]
+    command: ["/bin/bash", "/opt/homeorbit/build_valhalla.sh"]
+    volumes:
+      - ./data/raw:/data/raw:ro
+      - ./data/scripts/build_valhalla.sh:/opt/homeorbit/build_valhalla.sh:ro
+      - ./data/valhalla:/data/valhalla
+
+  valhalla:
+    image: ghcr.io/valhalla/valhalla:latest
+    container_name: homeorbit-valhalla
+    command: ["valhalla_service", "/data/valhalla/valhalla.json", "1"]
+    ports:
+      - "8002:8002"
+    volumes:
+      - ./data/raw:/data/raw:ro
+      - ./data/scripts/build_valhalla.sh:/opt/homeorbit/build_valhalla.sh:ro
+      - ./data/valhalla:/data/valhalla
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8002/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  postgis_data:
