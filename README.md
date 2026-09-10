@@ -44,6 +44,15 @@ HomeOrbit 是一个面向美国湾区的离线优先住房选址分析原型。�
 
 ## 启动与验证
 
+Windows 已安装 PowerShell 7、Docker Desktop、uv、Node.js 和项目依赖后：
+
+- 双击根目录 `Start-HomeOrbit.cmd`：等待数据库、路由、API 和网页就绪后自动打开 http://127.0.0.1:3000 。Docker Desktop 需提前启动。
+- 双击根目录 `Stop-HomeOrbit.cmd`：核对记录的进程及容器归属后关闭本轮服务，保留数据和 Docker Desktop。
+- PowerShell 7 命令：`./scripts/Start-HomeOrbit.ps1` 和 `./scripts/Stop-HomeOrbit.ps1`。
+- 日志位于 `tmp/runtime/logs/`。如提示已有状态文件，先执行关闭脚本，再启动。
+
+用户验证：启动后确认地图显示，点击湾区地图选点，检查步行等时圈及设施统计；关闭后刷新网页应无法连接，再启动应恢复。
+
 一次性镜像导入、PostGIS 数据导入、Valhalla 建图、评分基准构建、日常启动、API 示例与安全停止步骤见 [项目说明文档 1](docs/项目说明文档1.md)。资源来源、离线边界、署名与完整性校验见 [离线资源下载清单](docs/离线资源下载清单.md)。
 
 所有文件的实际大小和 SHA256 记录在 [离线资源 manifest](data/offline-assets-manifest.json)。真实浏览器、性能、断网代理、局部降级和截图证据记录在 [空间分析验收报告](docs/acceptance/homeorbit-spatial-analysis-report.md)；主控制器实测证据与用户验收状态分开记录。

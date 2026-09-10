@@ -147,7 +147,7 @@ class StubValhalla:
         self.error = error
         self.calls = []
 
-    async def isochrone(self, origin, mode, minutes):
+    async def isochrone(self, origin, mode, minutes, *, preserve_holes=False):
         self.calls.append((origin, mode, minutes))
         if self.error:
             raise self.error

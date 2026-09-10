@@ -11,7 +11,8 @@ export interface OverlayMap {
   getSource(id: string): unknown;
   addSource(id: string, source: SourceSpecification): void;
   getLayer(id: string): unknown;
-  addLayer(layer: LayerSpecification): void;
+  getStyle(): { layers?: Array<{ id: string; type?: string }> } | undefined;
+  addLayer(layer: LayerSpecification, beforeId?: string): void;
   setLayoutProperty(id: string, name: string, value: unknown): void;
   setFilter(id: string, filter: FilterSpecification | null): void;
 }
@@ -115,8 +116,12 @@ export function syncAnalysisOverlays(
   for (const [id, source] of sources) {
     if (!map.getSource(id)) map.addSource(id, structuredClone(source));
   }
+  const firstRoad = map.getStyle()?.layers?.find((layer) => layer.type === "line" && layer.id.startsWith("roads_"))?.id;
   for (const layer of layers) {
-    if (!map.getLayer(layer.id)) map.addLayer(structuredClone(layer));
+    if (!map.getLayer(layer.id)) {
+      const belowRoads = layer.type === "fill" && layer.source !== "analysis-facilities";
+      map.addLayer(structuredClone(layer), belowRoads ? firstRoad : undefined);
+    }
   }
 
   const update = (id: string, data: GeoJsonFeatureCollection) => {

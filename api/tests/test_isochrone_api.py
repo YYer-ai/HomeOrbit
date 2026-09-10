@@ -1,7 +1,10 @@
 import math
+import json
 
 import httpx
 import pytest
+from shapely.geometry import Polygon, shape
+from shapely.ops import unary_union
 
 from app.config import Settings
 from app.gis.errors import GisError
@@ -18,7 +21,7 @@ class StubValhallaClient:
         self.error = error
         self.calls = []
 
-    async def isochrone(self, origin, mode, minutes):
+    async def isochrone(self, origin, mode, minutes, *, preserve_holes=False):
         self.calls.append((origin, mode, minutes))
         if self.error:
             raise self.error
@@ -247,3 +250,36 @@ async def test_real_valhalla_returns_distinct_walking_and_driving_polygons() -> 
     for geometry in geometries:
         assert_valid_contour_collection(geometry, 15)
     assert geometries[0] != geometries[1]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_real_commute_does_not_fill_holes_reported_by_the_routing_engine() -> None:
+    """回归：默认 denoise 会填回路由引擎产生的内部空洞。"""
+    settings = Settings()
+    async with httpx.AsyncClient(trust_env=False) as upstream:
+        reference = await upstream.post(
+            f"{settings.valhalla_url}/isochrone",
+            params={"json": json.dumps({
+                "locations": [{"lon": -122.4194, "lat": 37.7749}],
+                "costing": "auto", "contours": [{"time": 15}],
+                "polygons": True, "denoise": 0,
+            }, separators=(",", ":"))},
+            timeout=10,
+        )
+    reference.raise_for_status()
+    polygons = []
+    for feature in reference.json()["features"]:
+        geom = shape(feature["geometry"])
+        polygons.extend(geom.geoms if geom.geom_type == "MultiPolygon" else [geom])
+    holes = [Polygon(ring) for polygon in polygons for ring in polygon.interiors]
+    assert holes, "本地路网测试点必须包含内部空洞，避免空断言"
+    async with lifespan(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/gis/isochrone", params={
+                "lng": -122.4194, "lat": 37.7749, "mode": "driving", "minutes": 15,
+            })
+    assert response.status_code == 200
+    actual = unary_union([shape(f["geometry"]) for f in response.json()["geometry"]["features"]])
+    for hole in sorted(holes, key=lambda g: g.area, reverse=True)[:5]:
+        assert actual.intersection(hole).area < hole.area * 0.001

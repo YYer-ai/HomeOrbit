@@ -13,7 +13,7 @@ async def build_isochrone_response(
     client: ValhallaClient,
     settings: Settings,
 ) -> IsochroneResponse:
-    geometry = await client.isochrone(query.origin, query.mode, query.minutes)
+    geometry = await client.isochrone(query.origin, query.mode, query.minutes, preserve_holes=True)
     return IsochroneResponse(
         origin=query.origin,
         mode=query.mode,

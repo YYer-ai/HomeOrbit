@@ -74,6 +74,27 @@ foreach ($containerName in @($state.containersStartedByScript)) {
     if ($LASTEXITCODE -ne 0) { throw "停止 $containerName 失败。" }
 }
 
+$portsToCheck = @(
+    foreach ($record in @($state.processesStartedByScript)) {
+        if ($record.Name -eq "web") { 3000 }
+        if ($record.Name -eq "api") { 8000 }
+    }
+    foreach ($containerName in @($state.containersStartedByScript)) {
+        if ($containerName -eq "homeorbit-postgis") { 5432 }
+        if ($containerName -eq "homeorbit-valhalla") { 8002 }
+    }
+)
+$deadline = [DateTime]::UtcNow.AddSeconds(30)
+do {
+    $listeners = @(Get-NetTCPConnection -State Listen -ErrorAction SilentlyContinue |
+        Where-Object LocalPort -In $portsToCheck)
+    if ($listeners.Count -eq 0) { break }
+    if ([DateTime]::UtcNow -ge $deadline) {
+        throw "关闭后端口仍未释放：$($listeners.LocalPort -join ', ')。已保留状态文件，请检查进程归属。"
+    }
+    Start-Sleep -Seconds 1
+} while ($true)
+
 $resolvedState = (Resolve-Path -LiteralPath $statePath).Path
 $allowedRuntimeRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot "tmp/runtime"))
 if (-not $resolvedState.StartsWith($allowedRuntimeRoot, [StringComparison]::OrdinalIgnoreCase)) {

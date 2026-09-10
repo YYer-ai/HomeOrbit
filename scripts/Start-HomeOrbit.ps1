@@ -29,6 +29,9 @@ function Assert-Command([string]$Name) {
 function Wait-DockerDesktop([int]$TimeoutSeconds) {
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
+        docker info --format '{{.ServerVersion}}' 1>$null 2>$null
+        if ($LASTEXITCODE -eq 0) { return }
+
         $rawStatus = docker desktop status --format json 2>$null
         if ($LASTEXITCODE -eq 0 -and $rawStatus) {
             $desktopStatus = $rawStatus | ConvertFrom-Json
@@ -80,6 +83,19 @@ function Assert-PortsFree([int[]]$Ports) {
         $details = $listeners | ForEach-Object { "端口 $($_.LocalPort)，PID $($_.OwningProcess)" }
         throw "检测到现有监听，拒绝覆盖：$($details -join '；')"
     }
+}
+
+function Wait-HttpReady([string]$Url, [int]$TimeoutSeconds) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        try {
+            $response = Invoke-WebRequest -Uri $Url -TimeoutSec 5
+            if ($response.StatusCode -eq 200) { return }
+        }
+        catch { }
+        Start-Sleep -Seconds 2
+    } while ([DateTime]::UtcNow -lt $deadline)
+    throw "等待 $Url 就绪超时，请查看 $logRoot。"
 }
 
 function Stop-StartedContainers([string[]]$ContainerNames) {
@@ -146,7 +162,7 @@ try {
             $startedProcesses.Add([pscustomobject]@{ Name = "api"; Id = $apiProcess.Id; Marker = (Join-Path $projectRoot "api") })
 
             $webProcess = Start-Process -FilePath (Get-Command "npm.cmd").Source `
-                -ArgumentList @("--prefix", (Join-Path $projectRoot "web"), "run", "dev") `
+                -ArgumentList @("--prefix", (Join-Path $projectRoot "web"), "run", "dev", "--", "--hostname", "127.0.0.1", "--port", "3000") `
                 -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru `
                 -RedirectStandardOutput (Join-Path $logRoot "web.stdout.log") `
                 -RedirectStandardError (Join-Path $logRoot "web.stderr.log")
@@ -171,6 +187,12 @@ try {
     }
     $state | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $statePath -Encoding utf8
 
+    if (-not $ServicesOnly) {
+        Wait-HttpReady "http://127.0.0.1:8000/gis/health" $HealthTimeoutSeconds
+        Wait-HttpReady "http://127.0.0.1:3000" $HealthTimeoutSeconds
+        Write-Host "HomeOrbit 已就绪：http://127.0.0.1:3000"
+    }
+
     [pscustomobject]@{
         Status = "started"
         ServicesOnly = [bool]$ServicesOnly
@@ -179,14 +201,16 @@ try {
     }
 }
 catch {
-    foreach ($process in $startedProcesses) {
-        Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
-    }
-    if ($startedContainers.Count -gt 0) {
-        Stop-StartedContainers @($startedContainers)
-    }
     if (Test-Path -LiteralPath $statePath) {
-        Remove-Item -LiteralPath $statePath -Force
+        & (Join-Path $PSScriptRoot "Stop-HomeOrbit.ps1")
+    }
+    else {
+        foreach ($process in $startedProcesses) {
+            Stop-Process -Id $process.Id -ErrorAction SilentlyContinue
+        }
+        if ($startedContainers.Count -gt 0) {
+            Stop-StartedContainers @($startedContainers)
+        }
     }
     throw
 }

@@ -30,6 +30,7 @@ class FakeMap {
   getSource = vi.fn((id: string) => this.sources.get(id));
   addLayer = vi.fn((layer: Record<string, unknown>) => this.layers.set(String(layer.id), layer));
   getLayer = vi.fn((id: string) => this.layers.get(id));
+  getStyle = () => ({ layers: [...this.layers.values()].map((layer) => ({ id: String(layer.id), type: String(layer.type) })) });
   setLayoutProperty = vi.fn((id: string, property: string, value: unknown) => {
     const layer = this.layers.get(id)!;
     layer.layout = { ...(layer.layout as object), [property]: value };
@@ -49,6 +50,15 @@ const state = {
 };
 
 describe("syncAnalysisOverlays", () => {
+  it("范围和人口填色置于道路下方，让路网及道路标签保持可见", () => {
+    const map = new FakeMap();
+    map.layers.set("roads_highway", { id: "roads_highway", type: "line" });
+    syncAnalysisOverlays(map, state);
+    for (const id of ["population-density-fill", "site-catchment-fill", "commute-isochrone-fill"]) {
+      expect(map.addLayer).toHaveBeenCalledWith(expect.objectContaining({ id }), "roads_highway");
+    }
+  });
+
   it("连续同步不重复 source/layer，现有 GeoJSON source 使用 setData", () => {
     const map = new FakeMap();
     syncAnalysisOverlays(map, state);

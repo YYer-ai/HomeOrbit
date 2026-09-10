@@ -63,6 +63,7 @@ export function AnalysisPanel({ origin, commute, site, facilities }: AnalysisPan
         <div className="section-title"><h3 id="commute-title">通勤等时圈</h3>{commute.loading && <span className="loading-label">计算中</span>}</div>
         {commute.error && <p role="alert" className="panel-error">{commute.error}</p>}
         {!commute.loading && !commute.error && commute.data && <p><strong className="mono-reading">{commute.data.minutes}</strong> 分钟 · {commute.data.mode === "walking" ? "步行" : "驾车"}</p>}
+        {commute.data && <p className="method-note">橙色为从选点出发的路网可达范围，保留内部空洞。边界为近似估算，沿实际道路的用时可能不同。</p>}
         {!commute.loading && !commute.error && !commute.data && <p className="muted">等待通勤分析</p>}
       </section>
 
@@ -71,6 +72,7 @@ export function AnalysisPanel({ origin, commute, site, facilities }: AnalysisPan
         {site.error && <p role="alert" className="panel-error">{site.error}</p>}
         {site.data && (
           <>
+            <p className="method-note">绿色虚线为配套统计使用的固定 15 分钟步行范围，与所选通勤时长分开计算。</p>
             <div className="population-reading"><span>估算人口</span><strong>{Math.round(site.data.population).toLocaleString("en-US")}</strong></div>
             <p className="method-note">ACS {site.data.acs_year} · tract 土地面积加权估算，假设区内人口均匀分布。</p>
             {site.data.score_status === "insufficient_population" ? (

@@ -21,6 +21,8 @@ class ValhallaClient:
         origin: Origin,
         mode: TravelMode,
         minutes: int,
+        *,
+        preserve_holes: bool = False,
     ) -> dict[str, Any]:
         payload = {
             "locations": [{"lon": origin.lng, "lat": origin.lat}],
@@ -29,6 +31,9 @@ class ValhallaClient:
             "polygons": True,
             "show_locations": True,
         }
+        if preserve_holes:
+            # 默认 denoise=1 会移除内部空洞；设施评分仍需匹配既有基准口径。
+            payload["denoise"] = 0
         try:
             response = await self._http_client.post(
                 f"{self._settings.valhalla_url.rstrip('/')}/isochrone",
