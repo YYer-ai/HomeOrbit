@@ -101,6 +101,22 @@ afterEach(() => {
 });
 
 describe("GIS API client", () => {
+  it("发送反向参数，并拒绝返回另一方向或缺少方向的结果", async () => {
+    const request = { lng: -122.4194, lat: 37.7749, mode: "driving" as const, minutes: 30 as const, direction: "inbound" as const };
+    const response = { origin: { lng: request.lng, lat: request.lat }, mode: request.mode, minutes: 30,
+      direction: "inbound", geometry: contour, data_version: "test", traffic_assumption: "static_network_cost" };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
+    vi.stubGlobal("window", { location: { hostname: "family-host.test" } });
+    vi.stubGlobal("fetch", fetchMock);
+    const signal = new AbortController().signal;
+    await expect(fetchIsochrone(request, signal)).resolves.toEqual(response);
+    expect(new URL(fetchMock.mock.calls[0][0]).searchParams.get("direction")).toBe("inbound");
+    for (const direction of ["outbound", "wrong", undefined]) {
+      fetchMock.mockResolvedValueOnce(jsonResponse({ ...response, direction }));
+      await expect(fetchIsochrone(request, signal)).rejects.toMatchObject({ code: "INVALID_RESPONSE" });
+    }
+  });
+
   it("fetchConfig 使用当前 hostname 并原样传递 AbortSignal", async () => {
     const signal = new AbortController().signal;
     const fetchMock = vi.fn().mockResolvedValue(
@@ -126,6 +142,7 @@ describe("GIS API client", () => {
       minutes: 30,
       geometry: contour,
       data_version: "test-v1",
+      direction: "outbound",
       traffic_assumption: "static_network_cost",
     };
     const fetchMock = vi.fn().mockResolvedValue(jsonResponse(response));
@@ -146,6 +163,7 @@ describe("GIS API client", () => {
       lat: "37.7749",
       mode: "driving",
       minutes: "30",
+      direction: "outbound",
     });
     expect(init).toEqual({ signal });
   });
@@ -259,6 +277,7 @@ describe("GIS API client", () => {
 
   it.each([
     ["HTML", new Response("<html>C:/private/stack</html>", { status: 500 }), "UNKNOWN_ERROR", "请求失败，请稍后重试"],
+    ["远离道路", jsonResponse({ code: "POINT_TOO_FAR_FROM_ROAD", message: "private" }, 422), "POINT_TOO_FAR_FROM_ROAD", "现有路网无法确认选点到道路或步道的连接，不代表现场不能通行。请移到附近已显示的道路或步道上重试"],
     [
       "内部 URL",
       jsonResponse(
@@ -288,6 +307,7 @@ describe("GIS API client", () => {
       minutes: 15,
       geometry: { type: "FeatureCollection", features: "C:/private" },
       data_version: "test",
+      direction: "outbound",
       traffic_assumption: "static_network_cost",
     };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse(invalidIsochrone)));
@@ -321,6 +341,7 @@ describe("GIS API client", () => {
       minutes: 30,
       geometry: contour,
       data_version: "test-v1",
+      direction: "outbound",
       traffic_assumption: "static_network_cost",
       ...override,
     };

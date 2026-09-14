@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 
 import httpx
 import pytest
@@ -22,6 +23,32 @@ POLYGON_COLLECTION = {
         }
     ],
 }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("snapped,error", [
+    ([-122.430374, 37.683942], "POINT_TOO_FAR_FROM_ROAD"),
+    ([-122.42761, 37.68732], None),
+    (None, "VALHALLA_UNAVAILABLE"),
+])
+async def test_interactive_origin_must_be_near_the_actual_network(httpx_mock, snapped, error):
+    collection = deepcopy(POLYGON_COLLECTION)
+    if snapped:
+        collection["features"].append({
+            "type": "Feature", "properties": {"type": "snapped", "location_index": 0},
+            "geometry": {"type": "MultiPoint", "coordinates": [snapped]},
+        })
+    httpx_mock.add_response(json=collection)
+    async with httpx.AsyncClient() as http_client:
+        client = ValhallaClient(http_client, Settings(valhalla_url="http://valhalla.test"))
+        call = client.isochrone(Origin(lng=-122.42760492773664, lat=37.687316698297295),
+                               "walking", 15, require_nearby_road=True)
+        if error:
+            with pytest.raises(GisError) as captured:
+                await call
+            assert captured.value.code == error
+        else:
+            assert await call == POLYGON_COLLECTION
 
 
 @pytest.mark.asyncio

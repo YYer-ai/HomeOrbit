@@ -1,4 +1,5 @@
 export type TravelMode = "walking" | "driving";
+export type TravelDirection = "outbound" | "inbound";
 export type Duration = 15 | 30 | 45 | 60;
 export type FacilityCategory =
   | "education"
@@ -12,6 +13,7 @@ export type GisErrorCode =
   | "POINT_OUTSIDE_COVERAGE"
   | "INVALID_MODE"
   | "INVALID_DURATION"
+  | "INVALID_DIRECTION"
   | "VALHALLA_UNAVAILABLE"
   | "SPATIAL_DATA_UNAVAILABLE"
   | "ANALYSIS_TIMEOUT";
@@ -68,6 +70,7 @@ export interface Isochrone {
   origin: Origin;
   mode: TravelMode;
   minutes: Duration;
+  direction: TravelDirection;
   geometry: GeoJsonFeatureCollection;
   data_version: string;
   traffic_assumption: "static_network_cost";

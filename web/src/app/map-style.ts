@@ -91,6 +91,15 @@ export function createBasemapStyle(
   if (theme === "transport") applyTransportHierarchy(styleLayers);
   if (theme === "analysis") quietAnalysisLayers(styleLayers);
 
+  for (const layer of styleLayers) {
+    if (!lineLayer(layer) || layer.id.endsWith("_casing")) continue;
+    if (layer.id.startsWith("roads_tunnels_")) {
+      layer.paint = { ...layer.paint, "line-color": "#7253A3", "line-dasharray": [3, 2], "line-opacity": 1 };
+    } else if (layer.id.startsWith("roads_bridges_")) {
+      layer.paint = { ...layer.paint, "line-color": "#287C9B", "line-opacity": 1 };
+    }
+  }
+
   return {
     version: 8,
     glyphs: `${base}/protomaps-assets/fonts/{fontstack}/{range}.pbf`,

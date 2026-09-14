@@ -89,7 +89,7 @@ function deferred<T>(): Deferred<T> {
 const empty = { type: "FeatureCollection" as const, features: [] };
 function commuteResult(origin: Origin, tag: string): Isochrone {
   return {
-    origin, mode: "walking", minutes: 15,
+    origin, mode: "walking", minutes: 15, direction: "outbound",
     geometry: {
       type: "FeatureCollection",
       features: [{ type: "Feature", properties: { contour: 15, tag }, geometry: { type: "Polygon", coordinates: [] } }],
@@ -130,6 +130,8 @@ describe("MapControls", () => {
       <MapControls
         theme="standard"
         mode="walking"
+        direction="outbound"
+        onDirectionChange={vi.fn()}
         minutes={15}
         populationVisible
         facilitiesVisible
@@ -154,6 +156,8 @@ describe("MapControls", () => {
       <MapControls
         theme="standard"
         mode="walking"
+        direction="outbound"
+        onDirectionChange={vi.fn()}
         minutes={15}
         populationVisible
         facilitiesVisible
@@ -186,6 +190,28 @@ describe("MapControls", () => {
 });
 
 describe("MapView 请求依赖", () => {
+  it("切换到达选点只重算通勤，取消旧方向并拒绝迟到响应覆盖地图", async () => {
+    const outbound = deferred<Isochrone>();
+    const inbound = deferred<Isochrone>();
+    mapMocks.fetchIsochrone.mockImplementationOnce(() => outbound.promise).mockImplementationOnce(() => inbound.promise);
+    render(<MapView />);
+    const map = mapMocks.maps[0];
+    const point = { lng: -122.4194, lat: 37.7749 };
+    act(() => map.handlers.get("click")?.({ lngLat: point } as never));
+    await waitFor(() => expect(mapMocks.fetchIsochrone).toHaveBeenCalledTimes(1));
+    const oldSignal = mapMocks.fetchIsochrone.mock.calls[0][1];
+    fireEvent.click(screen.getByRole("radio", { name: "到达选点" }));
+    await waitFor(() => expect(mapMocks.fetchIsochrone).toHaveBeenCalledTimes(2));
+    expect(mapMocks.fetchIsochrone.mock.calls[1][0]).toMatchObject({ ...point, direction: "inbound" });
+    expect(oldSignal.aborted).toBe(true);
+    expect(mapMocks.fetchSiteAnalysis).toHaveBeenCalledTimes(1);
+    await act(async () => inbound.resolve({ ...commuteResult(point, "inbound"), direction: "inbound" }));
+    expect(screen.getByText(/橙色为能在 15 分钟内到达选点/)).toBeInTheDocument();
+    await act(async () => outbound.resolve(commuteResult(point, "outbound")));
+    const source = map.sources.get("commute-isochrone")!;
+    expect(source.setData.mock.lastCall?.[0].features[0].properties.tag).toBe("inbound");
+  });
+
   it("无起点不请求；权重与主题不请求；时长只重发通勤；拖动重发两路并取消旧请求", async () => {
     render(<MapView />);
     expect(screen.getAllByRole("slider").map((slider) => (slider as HTMLInputElement).value)).toEqual(["20", "20", "20", "20", "20"]);

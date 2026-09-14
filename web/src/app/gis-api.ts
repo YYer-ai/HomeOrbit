@@ -7,6 +7,7 @@ import type {
   Origin,
   SiteAnalysis,
   TravelMode,
+  TravelDirection,
 } from "./gis-types";
 
 const FACILITY_CATEGORIES = [
@@ -152,10 +153,14 @@ function stableErrorMessage(code: string): string | undefined {
   switch (code) {
     case "POINT_OUTSIDE_COVERAGE":
       return "所选位置不在当前覆盖范围内";
+    case "POINT_TOO_FAR_FROM_ROAD":
+      return "现有路网无法确认选点到道路或步道的连接，不代表现场不能通行。请移到附近已显示的道路或步道上重试";
     case "INVALID_MODE":
       return "暂不支持该交通方式";
     case "INVALID_DURATION":
       return "通勤时间必须为 15、30、45 或 60 分钟";
+    case "INVALID_DIRECTION":
+      return "可达方向必须为从选点出发或到达选点";
     case "VALHALLA_UNAVAILABLE":
       return "路网分析服务暂不可用";
     case "SPATIAL_DATA_UNAVAILABLE":
@@ -172,6 +177,7 @@ function isIsochrone(value: unknown): value is Isochrone {
     isRecord(value) &&
     isOrigin(value.origin) &&
     (value.mode === "walking" || value.mode === "driving") &&
+    (value.direction === "outbound" || value.direction === "inbound") &&
     typeof value.minutes === "number" &&
     [15, 30, 45, 60].includes(value.minutes) &&
     isContourFeatureCollection(value.geometry, value.minutes) &&
@@ -292,6 +298,7 @@ export function fetchConfig(signal: AbortSignal): Promise<Config> {
 export interface IsochroneRequest extends Origin {
   mode: TravelMode;
   minutes: Duration;
+  direction?: TravelDirection;
 }
 
 export function fetchIsochrone(
@@ -304,8 +311,10 @@ export function fetchIsochrone(
     lat: String(request.lat),
     mode: request.mode,
     minutes: String(request.minutes),
+    direction: request.direction ?? "outbound",
   }).toString();
-  return requestJson(url.toString(), signal, isIsochrone);
+  return requestJson(url.toString(), signal, (value): value is Isochrone =>
+    isIsochrone(value) && value.direction === (request.direction ?? "outbound"));
 }
 
 export function fetchSiteAnalysis(

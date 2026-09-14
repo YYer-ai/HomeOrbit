@@ -35,6 +35,22 @@ function lineWidthAtZoom(style: StyleSpecification, id: string, zoom: number): n
 }
 
 describe("createBasemapStyle", () => {
+  it("所有主题的桥隧样式仅沿真实标签道路显示，且位于水域之上", () => {
+    for (const theme of ["standard", "transport", "analysis"] as const) {
+      const style = createBasemapStyle(theme, ASSET_BASE);
+      for (const [id, tag, color] of [
+        ["roads_bridges_minor", "is_bridge", "#287C9B"],
+        ["roads_tunnels_minor", "is_tunnel", "#7253A3"],
+      ]) {
+        const road = layer(style, id) as LineLayerSpecification;
+        expect(JSON.stringify(road.filter)).toContain(tag);
+        expect(road.paint?.["line-color"]).toBe(color);
+        expect(style.layers.indexOf(road)).toBeGreaterThan(style.layers.findIndex((item) => item.id === "water"));
+      }
+      expect((layer(style, "roads_tunnels_minor") as LineLayerSpecification).paint?.["line-dasharray"]).toEqual([3, 2]);
+    }
+  });
+
   it("三种主题都通过 MapLibre 最小样式规范验证", () => {
     for (const theme of ["standard", "transport", "analysis"] as const) {
       const errors = validateStyleMin(createBasemapStyle(theme, ASSET_BASE));

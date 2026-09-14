@@ -13,11 +13,16 @@ async def build_isochrone_response(
     client: ValhallaClient,
     settings: Settings,
 ) -> IsochroneResponse:
-    geometry = await client.isochrone(query.origin, query.mode, query.minutes, preserve_holes=True)
+    geometry = await client.isochrone(
+        query.origin, query.mode, query.minutes,
+        preserve_holes=True, reverse=query.direction == "inbound",
+        require_nearby_road=True,
+    )
     return IsochroneResponse(
         origin=query.origin,
         mode=query.mode,
         minutes=query.minutes,
+        direction=query.direction,
         geometry=geometry,
         data_version=settings.dataset_version,
     )
@@ -29,7 +34,7 @@ async def build_site_analysis_response(
     repository: SpatialRepository,
     settings: Settings,
 ) -> SiteAnalysisResponse:
-    catchment = await client.isochrone(query.origin, "walking", 15)
+    catchment = await client.isochrone(query.origin, "walking", 15, require_nearby_road=True)
     try:
         stats = await repository.analyze_catchment(catchment)
         baselines = await repository.baseline_samples() if stats.population >= 100 else {}

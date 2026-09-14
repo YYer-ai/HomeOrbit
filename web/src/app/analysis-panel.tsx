@@ -1,9 +1,10 @@
 import type { CSSProperties } from "react";
+import { CollapsiblePanel } from "./collapsible-panel";
 
 import { computeCompositeScore } from "./analysis-score";
 import type { FacilitySettings } from "./map-controls";
 import { facilityCategories } from "./map-controls";
-import type { FacilityCategory, Isochrone, Origin, SiteAnalysis } from "./gis-types";
+import type { FacilityCategory, Isochrone, Origin, SiteAnalysis, TravelDirection } from "./gis-types";
 
 interface RequestState<T> {
   loading: boolean;
@@ -13,6 +14,7 @@ interface RequestState<T> {
 
 interface AnalysisPanelProps {
   origin: Origin | null;
+  direction?: TravelDirection;
   commute: RequestState<Isochrone>;
   site: RequestState<SiteAnalysis>;
   facilities: FacilitySettings;
@@ -39,9 +41,9 @@ function MetricRow({ category, analysis }: { category: FacilityCategory; analysi
   );
 }
 
-export function AnalysisPanel({ origin, commute, site, facilities }: AnalysisPanelProps) {
+export function AnalysisPanel({ origin, direction = "outbound", commute, site, facilities }: AnalysisPanelProps) {
   if (!origin) {
-    return <aside className="analysis-panel empty"><p className="eyebrow">选址分析</p><h2>点击地图设置起点</h2><p>也可在设置后拖动标记，重新测量通勤与周边配套。</p></aside>;
+    return <CollapsiblePanel className="analysis-panel empty" label="选址分析结果"><p className="eyebrow">选址分析</p><h2>{direction === "inbound" ? "点击地图设置目的地" : "点击地图设置起点"}</h2><p>也可在设置后拖动标记，重新测量通勤与周边配套。</p></CollapsiblePanel>;
   }
 
   const weights = Object.fromEntries(
@@ -53,7 +55,7 @@ export function AnalysisPanel({ origin, commute, site, facilities }: AnalysisPan
   const zeroWeight = Object.values(weights).every((weight) => weight === 0);
 
   return (
-    <aside className="analysis-panel" aria-label="选址分析结果">
+    <CollapsiblePanel className="analysis-panel" label="选址分析结果">
       <header className="panel-heading">
         <p className="eyebrow">选址分析</p>
         <h2>{origin.lat.toFixed(5)}, {origin.lng.toFixed(5)}</h2>
@@ -62,8 +64,8 @@ export function AnalysisPanel({ origin, commute, site, facilities }: AnalysisPan
       <section aria-labelledby="commute-title">
         <div className="section-title"><h3 id="commute-title">通勤等时圈</h3>{commute.loading && <span className="loading-label">计算中</span>}</div>
         {commute.error && <p role="alert" className="panel-error">{commute.error}</p>}
-        {!commute.loading && !commute.error && commute.data && <p><strong className="mono-reading">{commute.data.minutes}</strong> 分钟 · {commute.data.mode === "walking" ? "步行" : "驾车"}</p>}
-        {commute.data && <p className="method-note">橙色为从选点出发的路网可达范围，保留内部空洞。边界为近似估算，沿实际道路的用时可能不同。</p>}
+        {!commute.loading && !commute.error && commute.data && <p><strong className="mono-reading">{commute.data.minutes}</strong> 分钟 · {commute.data.mode === "walking" ? "步行" : "驾车"} · {commute.data.direction === "inbound" ? "到达选点" : "从选点出发"}</p>}
+        {commute.data && <p className="method-note">{commute.data.direction === "inbound" ? `橙色为能在 ${commute.data.minutes} 分钟内到达选点的路网范围。` : `橙色为从选点出发 ${commute.data.minutes} 分钟内的路网可达范围。`}保留内部空洞，湖面不显示为可达陆地。边界为近似估算，沿实际道路的用时可能不同。</p>}
         {!commute.loading && !commute.error && !commute.data && <p className="muted">等待通勤分析</p>}
       </section>
 
@@ -90,6 +92,6 @@ export function AnalysisPanel({ origin, commute, site, facilities }: AnalysisPan
         )}
         {!site.loading && !site.error && !site.data && <p className="muted">等待设施分析</p>}
       </section>
-    </aside>
+    </CollapsiblePanel>
   );
 }

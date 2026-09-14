@@ -146,9 +146,12 @@ class StubValhalla:
     def __init__(self, error=None):
         self.error = error
         self.calls = []
+        self.options = []
 
-    async def isochrone(self, origin, mode, minutes, *, preserve_holes=False):
+    async def isochrone(self, origin, mode, minutes, *, preserve_holes=False, reverse=False, require_nearby_road=False):
+        assert require_nearby_road
         self.calls.append((origin, mode, minutes))
+        self.options.append((preserve_holes, reverse))
         if self.error:
             raise self.error
         return POLYGON
@@ -197,6 +200,7 @@ async def test_site_analysis_always_uses_one_walking_fifteen_minute_contour() ->
     body = response.json()
     assert len(valhalla.calls) == 1
     assert valhalla.calls[0][1:] == ("walking", 15)
+    assert valhalla.options == [(False, False)]
     assert repository.calls == [POLYGON]
     assert set(body["metrics"]) == set(CATEGORIES)
     assert body["metrics"]["education"]["raw_count"] == 1

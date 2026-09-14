@@ -117,10 +117,12 @@ export function syncAnalysisOverlays(
     if (!map.getSource(id)) map.addSource(id, structuredClone(source));
   }
   const firstRoad = map.getStyle()?.layers?.find((layer) => layer.type === "line" && layer.id.startsWith("roads_"))?.id;
+  // 复用底图同一水域面，避免湖岸错位；水域之上的桥隧仍正常显示。
+  const water = map.getStyle()?.layers?.find((layer) => layer.id === "water" && layer.type === "fill")?.id;
   for (const layer of layers) {
     if (!map.getLayer(layer.id)) {
-      const belowRoads = layer.type === "fill" && layer.source !== "analysis-facilities";
-      map.addLayer(structuredClone(layer), belowRoads ? firstRoad : undefined);
+      const belowWater = layer.type === "fill" || layer.type === "line";
+      map.addLayer(structuredClone(layer), belowWater ? water ?? firstRoad : undefined);
     }
   }
 

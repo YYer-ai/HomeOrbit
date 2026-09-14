@@ -50,6 +50,16 @@ const state = {
 };
 
 describe("syncAnalysisOverlays", () => {
+  it("水域遮住两个范围的填色和边线，道路仍位于水域上方", () => {
+    const map = new FakeMap();
+    map.layers.set("water", { id: "water", type: "fill" });
+    map.layers.set("roads_highway", { id: "roads_highway", type: "line" });
+    syncAnalysisOverlays(map, state);
+    for (const id of ["population-density-fill", "site-catchment-fill", "site-catchment-line", "commute-isochrone-fill", "commute-isochrone-line", "facilities-parks-fill"]) {
+      expect(map.addLayer).toHaveBeenCalledWith(expect.objectContaining({ id }), "water");
+    }
+  });
+
   it("范围和人口填色置于道路下方，让路网及道路标签保持可见", () => {
     const map = new FakeMap();
     map.layers.set("roads_highway", { id: "roads_highway", type: "line" });

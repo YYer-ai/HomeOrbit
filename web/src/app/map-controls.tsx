@@ -1,5 +1,6 @@
 import type { BasemapTheme } from "./map-style";
-import type { Duration, FacilityCategory, TravelMode } from "./gis-types";
+import { CollapsiblePanel } from "./collapsible-panel";
+import type { Duration, FacilityCategory, TravelMode, TravelDirection } from "./gis-types";
 
 export interface FacilitySetting {
   enabled: boolean;
@@ -11,6 +12,7 @@ export type FacilitySettings = Record<FacilityCategory, FacilitySetting>;
 interface MapControlsProps {
   theme: BasemapTheme;
   mode: TravelMode;
+  direction: TravelDirection;
   minutes: Duration;
   populationVisible: boolean;
   populationUnavailable?: boolean;
@@ -18,6 +20,7 @@ interface MapControlsProps {
   facilities: FacilitySettings;
   onThemeChange(theme: BasemapTheme): void;
   onModeChange(mode: TravelMode): void;
+  onDirectionChange(direction: TravelDirection): void;
   onMinutesChange(minutes: Duration): void;
   onPopulationVisibleChange(visible: boolean): void;
   onFacilitiesVisibleChange(visible: boolean): void;
@@ -36,7 +39,7 @@ export const facilityCategories = Object.keys(facilityNames) as FacilityCategory
 
 export function MapControls(props: MapControlsProps) {
   return (
-    <aside className="map-controls" aria-label="地图控制台">
+    <CollapsiblePanel className="map-controls" label="地图控制台">
       <header className="control-heading">
         <p className="eyebrow">HOMEORBIT · 家环</p>
         <h1>湾区选址测量台</h1>
@@ -52,6 +55,7 @@ export function MapControls(props: MapControlsProps) {
             </label>
           ))}
         </div>
+        <p className="road-legend"><span className="bridge-sample" />桥梁 <span className="tunnel-sample" />隧道 · 道路结构示意</p>
       </fieldset>
 
       <fieldset>
@@ -81,6 +85,19 @@ export function MapControls(props: MapControlsProps) {
             </label>
           ))}
         </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>可达方向</legend>
+        <div className="segmented two">
+          {(["outbound", "inbound"] as const).map((direction) => (
+            <label key={direction}>
+              <input type="radio" name="direction" checked={props.direction === direction} onChange={() => props.onDirectionChange(direction)} />
+              {direction === "outbound" ? "从选点出发" : "到达选点"}
+            </label>
+          ))}
+        </div>
+        <p className="control-note">选择“到达选点”，可查看哪些地方能在指定时间内到达工作地点。</p>
       </fieldset>
 
       <fieldset>
@@ -116,6 +133,6 @@ export function MapControls(props: MapControlsProps) {
         })}
         <p className="control-note">设施范围固定为 15 分钟步行圈；调整开关和权重只在本机重新计算指数。</p>
       </fieldset>
-    </aside>
+    </CollapsiblePanel>
   );
 }

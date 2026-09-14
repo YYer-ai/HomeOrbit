@@ -21,7 +21,8 @@ class StubValhallaClient:
         self.error = error
         self.calls = []
 
-    async def isochrone(self, origin, mode, minutes, *, preserve_holes=False):
+    async def isochrone(self, origin, mode, minutes, *, preserve_holes=False, reverse=False, require_nearby_road=False):
+        assert require_nearby_road
         self.calls.append((origin, mode, minutes))
         if self.error:
             raise self.error
@@ -75,6 +76,7 @@ async def test_isochrone_api_returns_real_geometry_and_stable_metadata() -> None
         "geometry": POLYGON_COLLECTION,
         "data_version": "test-v1",
         "traffic_assumption": "static_network_cost",
+        "direction": "outbound",
     }
     assert stub.calls[0][1:] == ("walking", 15)
 
@@ -90,6 +92,43 @@ async def request_with_stub(params: dict[str, object], stub: StubValhallaClient)
             return await client.get("/gis/isochrone", params=params)
     finally:
         app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("direction,reverse", [("outbound", False), ("inbound", True)])
+@pytest.mark.parametrize("mode", ["walking", "driving"])
+async def test_direction_reaches_routing_engine_and_response(direction, reverse, mode) -> None:
+    captured = []
+    async def transport(request):
+        captured.append(json.loads(request.url.params["json"]))
+        return httpx.Response(200, json={**POLYGON_COLLECTION, "features": [
+            *POLYGON_COLLECTION["features"],
+            {"type": "Feature", "properties": {"type": "snapped", "location_index": 0},
+             "geometry": {"type": "MultiPoint", "coordinates": [[-122.4194, 37.7749]]}},
+        ]})
+    async with httpx.AsyncClient(transport=httpx.MockTransport(transport)) as upstream:
+        response = await request_with_stub(
+            {"lng": -122.4194, "lat": 37.7749, "mode": mode, "minutes": 15, "direction": direction},
+            ValhallaClient(upstream, Settings()),
+        )
+    assert response.status_code == 200
+    assert response.json()["direction"] == direction
+    assert captured[0].get("reverse", False) is reverse
+    assert captured[0]["generalize"] == 0
+    assert captured[0]["denoise"] == 0
+    assert captured[0]["costing"] == ("auto" if mode == "driving" else "pedestrian")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("direction", ["sideways", "", "INBOUND"])
+async def test_invalid_direction_is_rejected_before_routing(direction) -> None:
+    stub = StubValhallaClient()
+    response = await request_with_stub(
+        {"lng": -122.4194, "lat": 37.7749, "mode": "walking", "minutes": 15, "direction": direction}, stub,
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "INVALID_DIRECTION"
+    assert not stub.calls
 
 
 @pytest.mark.asyncio
@@ -254,6 +293,27 @@ async def test_real_valhalla_returns_distinct_walking_and_driving_polygons() -> 
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+@pytest.mark.parametrize("direction", ["outbound", "inbound"])
+async def test_real_mountain_click_cannot_silently_start_448m_away(direction) -> None:
+    async with lifespan(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            far = await client.get("/gis/isochrone", params={
+                "lng": -122.42760492773664, "lat": 37.687316698297295,
+                "mode": "walking", "minutes": 30, "direction": direction,
+            })
+            near = await client.get("/gis/isochrone", params={
+                "lng": -122.430374, "lat": 37.683942,
+                "mode": "walking", "minutes": 30, "direction": direction,
+            })
+    assert far.status_code == 422
+    assert far.json()["code"] == "POINT_TOO_FAR_FROM_ROAD"
+    assert "geometry" not in far.json()
+    assert near.status_code == 200
+    assert_valid_contour_collection(near.json()["geometry"], 30)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_real_commute_does_not_fill_holes_reported_by_the_routing_engine() -> None:
     """回归：默认 denoise 会填回路由引擎产生的内部空洞。"""
     settings = Settings()
@@ -263,7 +323,7 @@ async def test_real_commute_does_not_fill_holes_reported_by_the_routing_engine()
             params={"json": json.dumps({
                 "locations": [{"lon": -122.4194, "lat": 37.7749}],
                 "costing": "auto", "contours": [{"time": 15}],
-                "polygons": True, "denoise": 0,
+                "polygons": True, "denoise": 0, "generalize": 0,
             }, separators=(",", ":"))},
             timeout=10,
         )
@@ -283,3 +343,35 @@ async def test_real_commute_does_not_fill_holes_reported_by_the_routing_engine()
     actual = unary_union([shape(f["geometry"]) for f in response.json()["geometry"]["features"]])
     for hole in sorted(holes, key=lambda g: g.area, reverse=True)[:5]:
         assert actual.intersection(hole).area < hole.area * 0.001
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize("mode", ["walking", "driving"])
+@pytest.mark.parametrize("minutes", [15, 30, 45, 60])
+async def test_real_inbound_matches_reverse_engine_for_every_mode_and_duration(mode, minutes) -> None:
+    async with httpx.AsyncClient(trust_env=False) as upstream:
+        reference = await upstream.post(f"{Settings().valhalla_url}/isochrone", json={
+            "locations": [{"lon": -122.4194, "lat": 37.7749}],
+            "costing": "auto" if mode == "driving" else "pedestrian",
+            "contours": [{"time": minutes}], "polygons": True, "denoise": 0, "reverse": True, "generalize": 0,
+        }, timeout=10)
+    reference.raise_for_status()
+    async with lifespan(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
+            responses = [await client.get("/gis/isochrone", params={
+                "lng": -122.4194, "lat": 37.7749, "mode": mode, "minutes": minutes, "direction": direction,
+            }) for direction in ("outbound", "inbound")]
+    geometries = []
+    for direction, response in zip(("outbound", "inbound"), responses):
+        assert response.status_code == 200
+        assert response.json()["direction"] == direction
+        collection = response.json()["geometry"]
+        assert_valid_contour_collection(collection, minutes)
+        geometry = unary_union([shape(f["geometry"]) for f in collection["features"]])
+        assert geometry.is_valid and not geometry.is_empty
+        geometries.append(geometry)
+    expected = unary_union([shape(f["geometry"]) for f in reference.json()["features"]])
+    assert geometries[1].equals(expected)
+    if mode == "driving":
+        assert geometries[0].symmetric_difference(geometries[1]).area > 0

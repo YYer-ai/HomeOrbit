@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 TravelMode: TypeAlias = Literal["walking", "driving"]
+TravelDirection: TypeAlias = Literal["outbound", "inbound"]
 FacilityCategory: TypeAlias = Literal[
     "education",
     "healthcare",
@@ -56,6 +57,7 @@ class IsochroneQuery(BaseModel):
     origin: Origin
     mode: TravelMode
     minutes: Duration
+    direction: TravelDirection = "outbound"
 
 
 class SiteAnalysisQuery(BaseModel):
@@ -72,6 +74,7 @@ class IsochroneResponse(BaseModel):
     origin: Origin
     mode: TravelMode
     minutes: Duration
+    direction: TravelDirection = "outbound"
     geometry: GeoJSON = Field(validation_alias="geojson")
     data_version: str
     traffic_assumption: Literal["static_network_cost"] = "static_network_cost"

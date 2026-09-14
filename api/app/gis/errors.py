@@ -7,8 +7,10 @@ from typing import Final, Literal, TypeAlias
 
 ErrorCode: TypeAlias = Literal[
     "POINT_OUTSIDE_COVERAGE",
+    "POINT_TOO_FAR_FROM_ROAD",
     "INVALID_MODE",
     "INVALID_DURATION",
+    "INVALID_DIRECTION",
     "VALHALLA_UNAVAILABLE",
     "SPATIAL_DATA_UNAVAILABLE",
     "ANALYSIS_TIMEOUT",
@@ -17,8 +19,10 @@ ErrorCode: TypeAlias = Literal[
 ERROR_MESSAGES: Final[Mapping[str, str]] = MappingProxyType(
     {
         "POINT_OUTSIDE_COVERAGE": "所选位置不在当前覆盖范围内",
+        "POINT_TOO_FAR_FROM_ROAD": "现有路网无法确认选点到道路或步道的连接，不代表现场不能通行。请移到附近已显示的道路或步道上重试",
         "INVALID_MODE": "暂不支持该交通方式",
         "INVALID_DURATION": "通勤时间必须为 15、30、45 或 60 分钟",
+        "INVALID_DIRECTION": "可达方向必须为从选点出发或到达选点",
         "VALHALLA_UNAVAILABLE": "路网分析服务暂不可用",
         "SPATIAL_DATA_UNAVAILABLE": "空间数据服务暂不可用",
         "ANALYSIS_TIMEOUT": "分析请求超时，请稍后重试",

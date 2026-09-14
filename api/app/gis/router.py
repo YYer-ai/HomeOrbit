@@ -19,6 +19,7 @@ from app.gis.schemas import (
     SiteAnalysisQuery,
     SiteAnalysisResponse,
     TravelMode,
+    TravelDirection,
 )
 from app.gis.service import build_isochrone_response, build_site_analysis_response
 from app.gis.valhalla import ValhallaClient
@@ -39,7 +40,7 @@ def get_spatial_repository(request: Request) -> SpatialRepository:
     return request.app.state.spatial_repository
 
 
-def _parse_query(lng: str | None, lat: str | None, mode: str | None, minutes: str | None) -> IsochroneQuery:
+def _parse_query(lng: str | None, lat: str | None, mode: str | None, minutes: str | None, direction: str = "outbound") -> IsochroneQuery:
     try:
         origin = Origin(lng=float(lng), lat=float(lat))
     except (TypeError, ValueError, ValidationError) as exc:
@@ -53,11 +54,14 @@ def _parse_query(lng: str | None, lat: str | None, mode: str | None, minutes: st
         raise GisError("INVALID_DURATION", status_code=400) from exc
     if parsed_minutes not in ALLOWED_DURATIONS:
         raise GisError("INVALID_DURATION", status_code=400)
+    if direction not in {"outbound", "inbound"}:
+        raise GisError("INVALID_DIRECTION", status_code=400)
 
     return IsochroneQuery(
         origin=origin,
         mode=cast(TravelMode, mode),
         minutes=parsed_minutes,
+        direction=cast(TravelDirection, direction),
     )
 
 
@@ -67,10 +71,11 @@ async def isochrone(
     lat: str | None = None,
     mode: str | None = None,
     minutes: str | None = None,
+    direction: str = "outbound",
     client: ValhallaClient = Depends(get_valhalla_client),
     settings: Settings = Depends(get_app_settings),
 ) -> IsochroneResponse:
-    query = _parse_query(lng, lat, mode, minutes)
+    query = _parse_query(lng, lat, mode, minutes, direction)
     return await build_isochrone_response(query, client, settings)
 
 

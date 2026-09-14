@@ -7,7 +7,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 
 import { AnalysisPanel } from "./analysis-panel";
 import { fetchIsochrone, fetchSiteAnalysis, GisApiError } from "./gis-api";
-import type { Duration, FacilityCategory, Isochrone, Origin, SiteAnalysis, TravelMode } from "./gis-types";
+import type { Duration, FacilityCategory, Isochrone, Origin, SiteAnalysis, TravelMode, TravelDirection } from "./gis-types";
 import { MapControls, type FacilitySettings } from "./map-controls";
 import { syncAnalysisOverlays, type AnalysisOverlayState } from "./map-overlays";
 import { createBasemapStyle, type BasemapTheme } from "./map-style";
@@ -33,6 +33,7 @@ export default function MapView() {
   const [origin, setOrigin] = useState<Origin | null>(null);
   const [theme, setTheme] = useState<BasemapTheme>("standard");
   const [mode, setMode] = useState<TravelMode>("walking");
+  const [direction, setDirection] = useState<TravelDirection>("outbound");
   const [minutes, setMinutes] = useState<Duration>(15);
   const [populationVisible, setPopulationVisible] = useState(true);
   const [populationUnavailable, setPopulationUnavailable] = useState(false);
@@ -116,13 +117,13 @@ export default function MapView() {
     queueMicrotask(() => {
       if (!controller.signal.aborted && generation === commuteGeneration.current) setCommute({ loading: true, error: null, data: null });
     });
-    fetchIsochrone({ ...origin, mode, minutes }, controller.signal)
+    fetchIsochrone({ ...origin, mode, minutes, direction }, controller.signal)
       .then((data) => { if (generation === commuteGeneration.current) setCommute({ loading: false, error: null, data }); })
       .catch((error: unknown) => {
         if ((error as { name?: string })?.name !== "AbortError" && generation === commuteGeneration.current) setCommute({ loading: false, error: safeMessage(error), data: null });
       });
     return () => controller.abort();
-  }, [origin, mode, minutes]);
+  }, [origin, mode, minutes, direction]);
 
   useEffect(() => {
     if (!origin) return;
@@ -146,13 +147,14 @@ export default function MapView() {
   return (
     <main className="map-shell">
       <div ref={containerRef} className="map-canvas" aria-label="湾区选址地图" />
-      <div className="map-status" role="status">地图 {mapStatus}{origin ? " · 拖动标记可重新分析" : " · 点击设置起点"}</div>
-      <MapControls theme={theme} mode={mode} minutes={minutes} populationVisible={populationVisible}
+      {(commute.error || site.error) && <div className="map-analysis-error" role="alert">{commute.error ? `通勤范围：${commute.error}` : `步行配套：${site.error}`}</div>}
+      <div className="map-status" role="status">地图 {mapStatus}{origin ? " · 拖动标记可重新分析" : direction === "inbound" ? " · 点击设置目的地" : " · 点击设置起点"}</div>
+      <MapControls theme={theme} mode={mode} direction={direction} minutes={minutes} populationVisible={populationVisible}
         populationUnavailable={populationUnavailable} facilitiesVisible={facilitiesVisible} facilities={facilities}
-        onThemeChange={setTheme} onModeChange={setMode} onMinutesChange={setMinutes}
+        onThemeChange={setTheme} onModeChange={setMode} onDirectionChange={setDirection} onMinutesChange={setMinutes}
         onPopulationVisibleChange={setPopulationVisible} onFacilitiesVisibleChange={setFacilitiesVisible}
         onFacilityChange={changeFacility} />
-      <AnalysisPanel origin={origin} commute={commute} site={site} facilities={facilities} />
+      <AnalysisPanel origin={origin} direction={direction} commute={commute} site={site} facilities={facilities} />
     </main>
   );
 }
